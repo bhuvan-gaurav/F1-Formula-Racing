@@ -15,4 +15,26 @@ SECRET_KEY ="SECRET067"
 ALGORITHM = "HS256"
 
 
-g
+def create_championship(organizer_id,name):
+    session=Session(engine)
+    new_championship=Championship(name=name,organizer_id=organizer_id)
+    session.add(new_championship)
+    session.commit()
+    response={ "id":new_championship.id, "name":new_championship.name,"organizer_id":new_championship.organizer_id
+    }
+    session.close()
+    return response
+
+
+def get_all_championships():
+    session=Session(engine)
+    championships=session.query(Championship).all()
+    response=[]
+    for c in championships:
+        response.append({
+            "id":c.id,
+            "name":c.name,
+            "organizer_id":c.organizer_id
+        })
+    session.close()
+    return response

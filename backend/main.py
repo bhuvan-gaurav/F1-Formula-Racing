@@ -13,15 +13,6 @@ def add_championship(name:str=Body(), token=Header(None)):
         raise HTTPException(status_code=403, detail="Only organizers can create championships")
     return functions.create_championship(organizer_id=user.user_id, name=name)
 
-def get_all_championships():
-    session=Session(engine)
-    championships=session.query(Championship).all()
-    response=[]
-    for c in championships:
-        response.append({  "id":c.id, "name":c.name,  "organizer_id":c.organizer_id
-        })
-    session.close()
-    return response
 
 @app.get("/teams/{team_id}")
 def team_details(team_id:int):

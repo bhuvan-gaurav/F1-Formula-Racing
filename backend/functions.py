@@ -143,6 +143,7 @@ def get_current_user(token):
     session.close()
     return user
 
+
 def reg_driver(user_id,name,country,date_of_birth,experience_years):
     session=Session(engine)
     new_driver=Driver(user_id=user_id,name=name,country=country,date_of_birth=date_of_birth,experience_years=experience_years)
@@ -176,5 +177,66 @@ def apply_to_team(user_id,team_id):
     driver.application_status="pending"
     session.commit()
     response={"driver_id":driver.id,"team_id":driver.team_id,"application_status":driver.application_status}
+    session.close()
+    return response
+
+def decide_application(user_id,driver_id,decision):
+    session=Session(engine)
+    driver=session.query(Driver).filter_by(id=driver_id).first()
+    if driver is None or driver.application_status != "pending":
+        session.close()
+        return False
+    team=session.query(Team).filter_by(id=driver.team_id).first()
+    if team.manager_id != user_id:
+        session.close()
+        return False
+    if decision == "accepted":
+        count=session.query(Driver).filter_by(team_id=team.id,application_status="accepted").count()
+        if count >= team.driver_limit:
+            session.close()
+            return False
+        driver.application_status="accepted"
+    elif decision == "rejected":
+        driver.application_status="rejected"
+        driver.team_id=None
+    else:
+        session.close()
+        return False
+    session.commit()
+    response={"driver_id":driver.id,"team_id":driver.team_id,"application_status":driver.application_status}
+    session.close()
+    return response
+
+def register_team_for_championship(user_id,championship_id):
+    session=Session(engine)
+    team=session.query(Team).filter_by(manager_id=user_id).first()
+    if team is None:
+        session.close()
+        return False
+    championship=session.query(Championship).filter_by(id=championship_id).first()
+    if championship is None:
+        session.close()
+        return False
+    already=session.query(ChampionshipTeam).filter_by(championship_id=championship_id,team_id=team.id).first()
+    if already is not None:
+        session.close()
+        return False
+    entry=ChampionshipTeam(championship_id=championship_id,team_id=team.id)
+    session.add(entry)
+    session.commit()
+    response={"id":entry.id,"championship_id":entry.championship_id,"team_id":entry.team_id}
+    session.close()
+    return response
+
+def get_team_details(team_id):
+    session=Session(engine)
+    team=session.query(Team).filter_by(id=team_id).first()
+    if team is None:
+        session.close()
+        return False
+    drivers=[]
+    for d in session.query(Driver).filter_by(team_id=team_id,application_status="accepted").all():
+        drivers.append({"id":d.id,"name":d.name,"country":d.country})
+    response={"id":team.id,"name":team.name,"country":team.country,"manager_id":team.manager_id,"driver_limit":team.driver_limit,"drivers":drivers}
     session.close()
     return response

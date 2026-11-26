@@ -27,6 +27,8 @@ def refresh_token(refresh_token=Header(None)):
     access_token = functions.create_token(username=username, token_type="access")
     return {"access_token": access_token}
 
+
+
 @app.post("/Drivers🏎️")
 def register_driver(name:str=Body(), country:str=Body(), date_of_birth:date=Body(), experience_years:int=Body(), token=Header(None)):
     user = functions.get_current_user(token)
@@ -39,9 +41,27 @@ def register_driver(name:str=Body(), country:str=Body(), date_of_birth:date=Body
 
 @app.post("/drivers/apply")
 def apply_team(team_id:int=Body(), token=Header(None)):
-    user = functions.get_current_user(token)
+    user = functions.get_current_user(token=token,token_type="access")
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired access token")
     if user.role != "driver":
         raise HTTPException(status_code=403, detail="Only drivers can apply")
     return functions.apply_to_team(user_id=user.user_id, team_id=team_id)
+
+@app.patch("/applications")
+def decide(driver_id:int=Body(), decision:str=Body(), token=Header(None)):
+    user = functions.get_current_user(token=token,token_type="access")
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid or expired access token")
+    return functions.decide_application(user_id=user.user_id, driver_id=driver_id, decision=decision)
+
+@app.post("/championships/register", status_code=201)
+def register_team(championship_id:int=Body(), token=Header(None)):
+    user = functions.get_current_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid or expired access token")
+    return functions.register_team_for_championship(user_id=user.user_id, championship_id=championship_id)
+
+@app.get("/teams/{team_id}")
+def team_details(team_id:int):
+    return functions.get_team_details(team_id)

@@ -1,7 +1,7 @@
-from sqlalchemy import Integer, String, Boolean, Column, DateTime, create_engine, inspect, ForeignKey
+from sqlalchemy import Integer, String, Column,create_engine,ForeignKey
 from sqlalchemy.orm import Session, declarative_base
 from sqlalchemy import Column, Integer, String, Date, ForeignKey
-from datetime import datetime,timedelta,timezone,date
+from datetime import datetime,timedelta,timezone
 import jwt 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
@@ -417,3 +417,4 @@ def get_driver_history(driver_id):
 
     session.close()
     return {"driver_id": driver_id, "total_points": total_points, "history": history}
+

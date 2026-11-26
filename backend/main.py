@@ -207,3 +207,4 @@ def get_driver_history(driver_id: int):
     if not result:
         raise HTTPException(status_code=404, detail="Driver not found")
     return result
+

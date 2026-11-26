@@ -145,10 +145,5 @@ Username: admin
 Password: Admin@123
 ```
 
-Change this behavior and use environment variables or a secrets manager for credentials and JWT signing keys before deploying publicly. Do not commit real secrets or production database files to GitHub.
 
-## Notes
 
-- The API source currently defines the driver profile route as `/Drivers🏎️`; clients must use that exact path unless it is changed in the application.
-- Keep the module names consistent with the startup command (`main.py` imports `functions.py`).
-- Consider adding input validation, database migrations, automated tests, and production configuration as the project grows.

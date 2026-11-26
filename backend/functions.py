@@ -120,3 +120,55 @@ def create_team(name, country, manager_id, driver_limit):
     }
     session.close()
     return result
+
+def get_teams():
+    session = Session(engine)
+    result = []
+    for team in session.query(Team).all():
+        count = session.query(Driver).filter_by(team_id=team.id).count()
+        result.append({"id": team.id, "name": team.name, "country": team.country,
+                       "manager_id": team.manager_id, "driver_limit": team.driver_limit,
+                       "driver_count": count})
+    session.close()
+    return result
+
+def get_standings(championship_id):
+    session = Session(engine)
+    championship = session.query(Championship).filter_by(id=championship_id).first()
+    if championship is None:
+        session.close()
+        return False
+
+    points = {}
+    races = session.query(Race).filter_by(championship_id=championship_id).all()
+    for race in races:
+        results = session.query(RaceResult).filter_by(race_id=race.id).all()
+        for result in results:
+            if result.driver_id not in points:
+                points[result.driver_id] = 0
+            points[result.driver_id] += result.points
+
+    standings = []
+    for driver_id in points:
+        standings.append({"driver_id": driver_id, "points": points[driver_id]})
+    standings.sort(key=get_points, reverse=True)
+
+    session.close()
+    return standings
+
+def get_driver_history(driver_id):
+    session = Session(engine)
+    driver = session.query(Driver).filter_by(id=driver_id).first()
+    if driver is None:
+        session.close()
+        return False
+
+    history = []
+    total_points = 0
+    results = session.query(RaceResult).filter_by(driver_id=driver_id).all()
+    for result in results:
+        total_points += result.points
+        history.append({"race_id": result.race_id, "position": result.position, "points": result.points})
+
+    session.close()
+    return {"driver_id": driver_id, "total_points": total_points, "history": history}

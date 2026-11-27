@@ -1,149 +1,142 @@
-# F1 Formula Racing Championship Manager
+# F1 – Formula Racing Championship Manager
 
-A FastAPI backend for managing a Formula racing championship. It supports user accounts and role-based access for administrators, organizers, drivers, and team managers, along with teams, race schedules, results, standings, and driver history.
+A FastAPI backend to manage a Formula 1-style racing championship. Admins manage organizers and teams, organizers schedule races and publish results, and users register as drivers, join teams and take part in championships. Standings are calculated automatically from published race results.
 
-## Features
+**Stack:** Python, FastAPI, Pydantic, SQLAlchemy, SQLite, JWT (access + refresh), Argon2 password hashing, Docker, AWS EC2, GitHub Actions
 
-- User registration and login with Argon2 password hashing
-- Short-lived JWT access tokens and refresh tokens
-- Admin-managed team and organizer accounts
-- Driver profiles and team applications with manager approval
-- Championship creation, team registration, and race scheduling
-- Race result submission with automatic points allocation
-- Championship standings and driver race history
-- SQLite persistence through SQLAlchemy
-- Interactive API documentation provided by FastAPI
 
-## Technology
+## 1. Project and Team
 
-- Python
-- FastAPI
-- SQLAlchemy
-- SQLite
-- PyJWT
-- Argon2
+Members -Akshay Bhuvan  Jashan 
 
-## Project files
 
-The application code is organized into an API module and a database/business-logic module:
+## 2. Live App
 
-```text
-.
-├── main.py        # FastAPI routes
-├── functions.py   # SQLAlchemy models and application logic
-├── requirements.txt
-└── README.md
+- API: `http://<EC2_PUBLIC_IP>:8000`
+- Docs: `http://<EC2_PUBLIC_IP>:8000/docs`
+
+
+## 3. How to Run
+
+**Project files**
+```
+main.py          # FastAPI routes, request validation, role checks
+functions.py     # database tables, login/token logic, business logic
+FormulaRacing.db # SQLite database (created automatically on first run)
 ```
 
-The SQLite database file (`FormulaRacing.db`) is created automatically when the database module is first loaded.
-
-## Getting started
-
-### 1. Clone the repository
-
+**Backend**
 ```bash
-git clone https://github.com/<your-username>/<your-repository>.git
-cd <your-repository>
+git clone https://github.com/<user>/<repo>.git
+cd <repo>
+python -m venv venv
+ venv\Scripts\activate
+uvicorn main:app --port 8000 --reload
 ```
+Open `http://localhost:8000/docs`.
 
-### 2. Create and activate a virtual environment
 
+**Docker 
 ```bash
-python -m venv .venv
+docker build -t f1-championship-manager .
+mkdir -p data
+docker run -d --name f1-api -p 8001:8001 -v $(pwd)/data:/app/data f1-championship-manager
 ```
 
-macOS/Linux:
+## 4. API Contract
 
-```bash
-source .venv/bin/activate
-```
+**Sending the token:** protected endpoints read the access token from a request header named `token`. The refresh endpoint reads the refresh token from a header named `refresh-token`.
 
-Windows PowerShell:
+**Roles:** `admin`, `organizer`, `driver`. New registrations are `driver` by default and only admins can create organizers. A team manager is the user set as `manager_id` of a team.
 
-```powershell
-.venv\Scripts\Activate.ps1
-```
+| # | Functionality | Method | Path | Access | Request body | Success |
+|---|---|---|---|---|---|---|
+| A1 | Register | POST | `/register` | Public | user_name, password | 200 |
+| A2 | Login (access + refresh tokens) | POST | `/login` | Public | username, password | 200 |
+| A3 | New access token | POST | `/refresh` | Public (refresh-token header) | – | 200 |
+| E1 | Create organizer account | POST | `/organizers` | Admin | user_name, password | 201 |
+| E2 | Create racing team | POST | `/teams` | Admin | name, country, manager_id, driver_limit | 201 |
+| E3 | Get all teams | GET | `/teams` | All | – | 200 |
+| E4 | Get team details | GET | `/teams/{team_id}` | All | – | 200 |
+| E5 | Create championship | POST | `/championships` | Organizer | name | 201 |
+| E6 | Get all championships | GET | `/championships` | All | – | 200 |
+| E7 | Register driver profile | POST | `/drivers` | Driver | name, country, date_of_birth, experience_years | 201 |
+| E8 | Apply to join a team | POST | `/drivers/apply` | Driver | team_id | 200 |
+| E9 | Accept or reject application | PATCH | `/applications` | Team manager | driver_id, decision (`accepted` or `rejected`) | 200 |
+| E10 | Register team for championship | POST | `/championships/register` | Team manager | championship_id | 201 |
+| E11 | Schedule a race | POST | `/races` | Organizer | championship_id, name, location, race_date | 201 |
+| E12 | Get races of a championship | GET | `/championships/{championship_id}/races` | All | – | 200 |
+| E13 | Submit race results | POST | `/results` | Organizer | race_id, results (list of driver_id, position, fastest_lap optional) | 201 |
+| E14 | Championship standings | GET | `/standings?championship_id=` | All | – | 200 |
+| E15 | Driver performance history | GET | `/driver-history?driver_id=` | All | – | 200 |
 
-### 3. Install dependencies
+**Scoring**
 
-Create a `requirements.txt` containing:
+| Position | 1st | 2nd | 3rd | 4th | 5th | 6th | 7th | 8th | 9th | 10th |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Points | 25 | 18 | 15 | 12 | 10 | 8 | 6 | 4 | 2 | 1 |
 
-```text
-fastapi
-uvicorn[standard]
-sqlalchemy
-PyJWT
-argon2-cffi
-```
+Positions 11 and below score 0. Standings add up each driver's points across all races in the championship, highest first.
 
-Then install them:
+**Business rules**
+- A team has a name, country, team manager and a driver limit.
+- A driver applies to a team and only that team's manager can accept or reject.
+- A team cannot accept more drivers than its driver limit.
+- A driver can only apply if they have no pending or accepted application, so they cannot be in more than one team.
+- Only drivers accepted into a team that is registered for the championship can receive results.
 
-```bash
-pip install -r requirements.txt
-```
+**Error rules**
 
-### 4. Start the API
+| Status | Meaning |
+|---|---|
+| 400 | Business rule broken (team full, not the team's manager, already applied, profile already exists) |
+| 401 | Missing, invalid or expired token, wrong login |
+| 403 | Wrong role for the endpoint |
+| 404 | Team, championship or driver not found |
+| 409 | Username already exists |
+| 422 | Invalid request body |
 
-```bash
-uvicorn main:app --reload
-```
+## 5. Database (SQLite)
 
-By default, the API is available at `http://127.0.0.1:8000`.
+- **users:** user_id, user_name, password (hashed), role
+- **teams:** id, name, country, manager_id, driver_limit
+- **drivers:** id, user_id, name, country, date_of_birth, experience_years, team_id, application_status
+- **championships:** id, name, organizer_id
+- **championship_teams:** id, championship_id, team_id
+- **races:** id, championship_id, name, location, race_date
+- **race_results:** id, race_id, driver_id, position, points, fastest_lap
 
-## API documentation
+A driver's application is stored on the `drivers` row: `team_id` is the team applied to and `application_status` is `pending`, `accepted` or `rejected`.
 
-With the server running, open:
+## 6. Deployment and CI/CD
 
-- Swagger UI: `http://127.0.0.1:8000/docs`
-  
+- Dockerfile runs the app on port 8001 and the image is pushed to Docker Hub.
+- One AWS EC2 instance runs the container. The security group allows ports 22 (SSH) and 8001 (API).
+- GitHub Actions (`.github/workflows/deploy.yml`) builds the image, pushes it to Docker Hub, connects to EC2 over SSH, pulls the latest image and replaces the running container.
+- GitHub Secrets used: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`.
 
-## API overview
+## 7. 3-Day Contribution Plan
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `POST` | `/register` | Register a user account (driver role by default) |
-| `POST` | `/login` | Log in and receive access and refresh tokens |
-| `POST` | `/refresh` | Exchange a refresh token for a new access token |
-| `POST` | `/organizers` | Create an organizer account (admin only) |
-| `POST` | `/teams` | Create a team (admin only) |
-| `GET` | `/teams` | List teams and accepted driver counts |
-| `GET` | `/teams/{team_id}` | Get team details |
-| `POST` | `/Drivers` | Create a driver profile |
-| `POST` | `/drivers/apply` | Apply to join a team |
-| `PATCH` | `/applications` | Accept or reject a driver application |
-| `POST` | `/championships` | Create a championship (organizer only) |
-| `GET` | `/championships` | List championships |
-| `POST` | `/championships/register` | Register a manager's team for a championship |
-| `POST` | `/races` | Schedule a championship race (organizer only) |
-| `GET` | `/championships/{championship_id}/races` | List races in a championship |
-| `POST` | `/results` | Submit race results (organizer only) |
-| `GET` | `/standings?championship_id={id}` | Get championship driver standings |
-| `GET` | `/driver-history?driver_id={id}` | Get a driver's results and points total |
+### Day 1
 
-Endpoints that require authentication accept the access token in the `token` request header. The refresh endpoint accepts the refresh token in the `refresh_token` header.
+| Member | Work |
+|---|---|
+| Akshay | E7,E8 |
+| Bhuvan | E1,E2 |
+| Jashan |E5,E6  |
 
-## Points system
+### Day 2
 
-The application awards points to the top ten finishers:
+| Member | Work |
+|---|---|
+| Akshay | E9,E10 |
+| Bhuvan | E3,E14  |
+| Jashan | E11,E12  |
+ 
+### Day 3
 
-| Position | Points | Position | Points |
-| ---: | ---: | ---: | ---: |
-| 1 | 25 | 6 | 8 |
-| 2 | 18 | 7 | 6 |
-| 3 | 15 | 8 | 4 |
-| 4 | 12 | 9 | 2 |
-| 5 | 10 | 10 | 1 |
-
-Positions outside the top ten receive zero points.
-
-## Initial administrator
-
-On first database initialization, the code creates an administrator account with these development credentials:
-
-```text
-Username: admin
-Password: Admin@123
-```
-
-
-
+| Member | Work |
+|---|---|
+| Akshay | E4|
+| Bhuvan | E15 |
+| Jashan | E13 |

@@ -12,8 +12,8 @@ Members -Akshay Bhuvan  Jashan
 
 ## 2. Live App
 
-- API: `http://<EC2_PUBLIC_IP>:8000`
-- Docs: `http://<EC2_PUBLIC_IP>:8000/docs`
+- API: `http://<EC2_PUBLIC_IP>:8001`
+- Docs: `http://<EC2_PUBLIC_IP>:8001/docs`
 
 
 ## 3. How to Run
